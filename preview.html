@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI Meeting-to-Accountability System</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;font-family:Arial,Helvetica,sans-serif;background:#f4f7fb;color:#172033}
+header{background:linear-gradient(135deg,#182848,#3b5bdb);color:white;padding:34px 7%;text-align:center}
+header h1{margin:0 0 10px;font-size:34px}
+header p{margin:0;opacity:.9}
+main{max-width:1100px;margin:30px auto;padding:0 20px}
+.panel,.card{background:white;border-radius:16px;padding:24px;box-shadow:0 8px 25px rgba(20,30,60,.08);margin-bottom:22px}
+h2{margin-top:0}
+textarea{width:100%;min-height:180px;padding:15px;border:1px solid #ccd4e0;border-radius:10px;font-size:15px;resize:vertical}
+button{margin-top:14px;background:#3157d5;color:white;border:0;border-radius:10px;padding:13px 24px;font-size:16px;font-weight:bold;cursor:pointer}
+button:hover{background:#2446b7}
+button.secondary{background:#eef2ff;color:#3157d5;margin-left:8px}
+.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:18px}
+.card{min-height:180px}
+.card h3{margin-top:0}
+.item{background:#f7f9fc;border-left:4px solid #3157d5;padding:12px;margin:10px 0;border-radius:8px}
+.badge{display:inline-block;padding:4px 9px;border-radius:20px;background:#e8f7ed;color:#16733b;font-size:12px;font-weight:bold}
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:22px}
+.stat{background:white;padding:18px;border-radius:12px;text-align:center;box-shadow:0 5px 18px rgba(20,30,60,.06)}
+.stat b{display:block;font-size:28px;color:#3157d5}
+.empty{color:#667085}
+footer{text-align:center;padding:25px;color:#667085}
+@media(max-width:800px){.grid,.stats{grid-template-columns:1fr}.secondary{margin-left:0}}
+</style>
+</head>
+<body>
+
+<header>
+<h1>🤖 AI Meeting-to-Accountability</h1>
+<p>Convert meeting discussions into tasks, owners, deadlines and unresolved issues.</p>
+</header>
+
+<main>
+<section class="panel">
+<h2>📝 Meeting Transcript</h2>
+<textarea id="transcript" placeholder="Paste your meeting transcript here..."></textarea>
+<br>
+<button onclick="analyzeMeeting()">Analyze Meeting</button>
+<button class="secondary" onclick="loadDemo()">Load Demo</button>
+</section>
+
+<section class="stats">
+<div class="stat"><b id="taskCount">0</b>Action Items</div>
+<div class="stat"><b id="decisionCount">0</b>Decisions</div>
+<div class="stat"><b id="issueCount">0</b>Unresolved Issues</div>
+<div class="stat"><b id="ownerCount">0</b>Owners Found</div>
+</section>
+
+<section class="grid">
+<div class="card">
+<h3>📋 Action Items</h3>
+<div id="actions" class="empty">No action items yet.</div>
+</div>
+<div class="card">
+<h3>✅ Decisions</h3>
+<div id="decisions" class="empty">No decisions yet.</div>
+</div>
+<div class="card">
+<h3>⚠️ Unresolved Issues</h3>
+<div id="issues" class="empty">No unresolved issues yet.</div>
+</div>
+</section>
+
+<section class="panel">
+<h2>📊 Accountability Tracker</h2>
+<div id="tracker" class="empty">Analyze a meeting to create the tracker.</div>
+</section>
+</main>
+
+<footer>Hackathon MVP • AI Meeting-to-Accountability System</footer>
+
+<script>
+function analyzeMeeting(){
+  const text=document.getElementById("transcript").value.trim();
+  if(!text){alert("Please paste a meeting transcript first.");return;}
+
+  const lines=text.split(/\n+/).map(x=>x.trim()).filter(Boolean);
+  const actions=[], decisions=[], issues=[], owners=new Set();
+
+  lines.forEach(line=>{
+    const lower=line.toLowerCase();
+
+    if(lower.includes("not decided") || lower.includes("not been decided") ||
+       lower.includes("pending") || lower.includes("unresolved") ||
+       lower.includes("not finalized") || lower.includes("yet to decide")){
+      issues.push(line);
+    }
+
+    if(lower.includes("decided") || lower.includes("decision") ||
+       lower.includes("agreed") || lower.includes("approved")){
+      if(!lower.includes("not decided") && !lower.includes("not been decided"))
+        decisions.push(line);
+    }
+
+    if(lower.includes("will ") || lower.includes("must ") ||
+       lower.includes("needs to ") || lower.includes("responsible for") ||
+       lower.includes("assigned to ")){
+      let owner="Not specified";
+      const m=line.match(/\b([A-Z][a-z]+)\s+(?:will|must|needs to|is responsible)/);
+      if(m){owner=m[1];owners.add(owner);}
+      const deadlineMatch=line.match(/\b(by|before|on)\s+([A-Za-z0-9 ,'-]+)/i);
+      const deadline=deadlineMatch ? deadlineMatch[2].trim() : "Not specified";
+      actions.push({text:line,owner,deadline});
+    }
+  });
+
+  if(!actions.length){
+    actions.push({text:"No explicit action item detected.",owner:"Not specified",deadline:"Not specified"});
+  }
+
+  document.getElementById("actions").innerHTML=actions.map(a=>
+    `<div class="item"><b>Task:</b> ${escapeHtml(a.text)}<br><b>Owner:</b> ${escapeHtml(a.owner)}<br><b>Deadline:</b> ${escapeHtml(a.deadline)}<br><span class="badge">NEW</span></div>`
+  ).join("");
+
+  document.getElementById("decisions").innerHTML=decisions.length
+    ? decisions.map(x=>`<div class="item">${escapeHtml(x)}</div>`).join("")
+    : '<p class="empty">No explicit decision detected.</p>';
+
+  document.getElementById("issues").innerHTML=issues.length
+    ? issues.map(x=>`<div class="item">${escapeHtml(x)}</div>`).join("")
+    : '<p class="empty">No unresolved issue detected.</p>';
+
+  document.getElementById("taskCount").textContent=actions.length;
+  document.getElementById("decisionCount").textContent=decisions.length;
+  document.getElementById("issueCount").textContent=issues.length;
+  document.getElementById("ownerCount").textContent=owners.size;
+
+  document.getElementById("tracker").innerHTML=actions.map(a=>
+    `<div class="item"><b>${escapeHtml(a.owner)}</b> → ${escapeHtml(a.text)}<br>Deadline: ${escapeHtml(a.deadline)} &nbsp; <span class="badge">NEW</span></div>`
+  ).join("");
+}
+
+function loadDemo(){
+document.getElementById("transcript").value=
+`Arun will complete the login page by Friday.
+Priya will test the payment module by Monday.
+The hosting provider has not been decided.
+The team agreed to use cloud hosting after testing.`;
+analyzeMeeting();
+}
+
+function escapeHtml(s){
+return s.replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[m]));
+}
+</script>
+</body>
+</html>
